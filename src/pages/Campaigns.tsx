@@ -151,7 +151,7 @@ export default function Campaigns() {
       variant_label: s.variant_label,
     }));
     if (inserts.length > 0) {
-      const { error } = await supabase.from("campaign_steps").insert(inserts);
+      const { error } = await (supabase as any).from("campaign_steps").insert(inserts);
       if (error) { toast.error(error.message); return; }
     }
     toast.success("Sequence saved");

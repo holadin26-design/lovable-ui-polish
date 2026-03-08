@@ -139,7 +139,7 @@ export default function Campaigns() {
   const saveSteps = async () => {
     if (!showStepsDialog || !user) return;
     // Delete existing steps
-    await supabase.from("campaign_steps").delete().eq("campaign_id", showStepsDialog);
+    await (supabase as any).from("campaign_steps").delete().eq("campaign_id", showStepsDialog);
     // Insert new steps
     const inserts = steps.map(s => ({
       campaign_id: showStepsDialog,

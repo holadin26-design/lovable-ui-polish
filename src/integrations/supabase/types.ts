@@ -129,6 +129,8 @@ export type Database = {
         Row: {
           attempt_number: number
           body: string
+          bounce_reason: string | null
+          bounce_type: string | null
           created_at: string
           email_account_id: string | null
           id: string
@@ -146,6 +148,8 @@ export type Database = {
         Insert: {
           attempt_number?: number
           body: string
+          bounce_reason?: string | null
+          bounce_type?: string | null
           created_at?: string
           email_account_id?: string | null
           id?: string
@@ -163,6 +167,8 @@ export type Database = {
         Update: {
           attempt_number?: number
           body?: string
+          bounce_reason?: string | null
+          bounce_type?: string | null
           created_at?: string
           email_account_id?: string | null
           id?: string
@@ -234,6 +240,30 @@ export type Database = {
           },
         ]
       }
+      suppressions: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       templates: {
         Row: {
           body: string
@@ -269,6 +299,47 @@ export type Database = {
           variables?: string[] | null
         }
         Relationships: []
+      }
+      tracking_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          followup_id: string
+          id: string
+          ip_address: string | null
+          link_url: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          followup_id: string
+          id?: string
+          ip_address?: string | null
+          link_url?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          followup_id?: string
+          id?: string
+          ip_address?: string | null
+          link_url?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_events_followup_id_fkey"
+            columns: ["followup_id"]
+            isOneToOne: false
+            referencedRelation: "followups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       warmup_logs: {
         Row: {

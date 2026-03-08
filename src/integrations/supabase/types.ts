@@ -14,7 +14,353 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      campaigns: {
+        Row: {
+          created_at: string
+          email_account_id: string | null
+          followup_delay_hours: number
+          id: string
+          max_followups: number
+          name: string
+          status: Database["public"]["Enums"]["campaign_status"]
+          template_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_account_id?: string | null
+          followup_delay_hours?: number
+          id?: string
+          max_followups?: number
+          name: string
+          status?: Database["public"]["Enums"]["campaign_status"]
+          template_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_account_id?: string | null
+          followup_delay_hours?: number
+          id?: string
+          max_followups?: number
+          name?: string
+          status?: Database["public"]["Enums"]["campaign_status"]
+          template_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_accounts: {
+        Row: {
+          app_password: string
+          created_at: string
+          daily_send_limit: number
+          display_name: string | null
+          email: string
+          id: string
+          imap_host: string
+          imap_port: number
+          is_primary: boolean
+          sends_today: number
+          smtp_host: string
+          smtp_port: number
+          updated_at: string
+          user_id: string
+          warmup_enabled: boolean
+          warmup_level: number
+        }
+        Insert: {
+          app_password: string
+          created_at?: string
+          daily_send_limit?: number
+          display_name?: string | null
+          email: string
+          id?: string
+          imap_host?: string
+          imap_port?: number
+          is_primary?: boolean
+          sends_today?: number
+          smtp_host?: string
+          smtp_port?: number
+          updated_at?: string
+          user_id: string
+          warmup_enabled?: boolean
+          warmup_level?: number
+        }
+        Update: {
+          app_password?: string
+          created_at?: string
+          daily_send_limit?: number
+          display_name?: string | null
+          email?: string
+          id?: string
+          imap_host?: string
+          imap_port?: number
+          is_primary?: boolean
+          sends_today?: number
+          smtp_host?: string
+          smtp_port?: number
+          updated_at?: string
+          user_id?: string
+          warmup_enabled?: boolean
+          warmup_level?: number
+        }
+        Relationships: []
+      }
+      followups: {
+        Row: {
+          attempt_number: number
+          body: string
+          created_at: string
+          email_account_id: string | null
+          id: string
+          max_attempts: number
+          message_id: string | null
+          recipient_email: string
+          scheduled_for: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["followup_status"]
+          subject: string
+          thread_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          body: string
+          created_at?: string
+          email_account_id?: string | null
+          id?: string
+          max_attempts?: number
+          message_id?: string | null
+          recipient_email: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["followup_status"]
+          subject: string
+          thread_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_number?: number
+          body?: string
+          created_at?: string
+          email_account_id?: string | null
+          id?: string
+          max_attempts?: number
+          message_id?: string | null
+          recipient_email?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["followup_status"]
+          subject?: string
+          thread_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followups_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          campaign_id: string | null
+          company: string | null
+          created_at: string
+          custom_fields: Json | null
+          email: string
+          id: string
+          name: string | null
+          status: Database["public"]["Enums"]["lead_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          company?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          email: string
+          id?: string
+          name?: string | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string | null
+          company?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          email?: string
+          id?: string
+          name?: string | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          name: string
+          subject: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+          variables: string[] | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          name: string
+          subject: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          variables?: string[] | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          name?: string
+          subject?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          variables?: string[] | null
+        }
+        Relationships: []
+      }
+      warmup_logs: {
+        Row: {
+          direction: string
+          id: string
+          partner_email: string
+          sent_at: string
+          subject: string | null
+          user_id: string
+          warmup_schedule_id: string
+        }
+        Insert: {
+          direction: string
+          id?: string
+          partner_email: string
+          sent_at?: string
+          subject?: string | null
+          user_id: string
+          warmup_schedule_id: string
+        }
+        Update: {
+          direction?: string
+          id?: string
+          partner_email?: string
+          sent_at?: string
+          subject?: string | null
+          user_id?: string
+          warmup_schedule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warmup_logs_warmup_schedule_id_fkey"
+            columns: ["warmup_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "warmup_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warmup_schedules: {
+        Row: {
+          created_at: string
+          current_daily_limit: number
+          days_active: number
+          email_account_id: string
+          id: string
+          ramp_increment: number
+          status: Database["public"]["Enums"]["warmup_status"]
+          target_daily_limit: number
+          total_received: number
+          total_sent: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_daily_limit?: number
+          days_active?: number
+          email_account_id: string
+          id?: string
+          ramp_increment?: number
+          status?: Database["public"]["Enums"]["warmup_status"]
+          target_daily_limit?: number
+          total_received?: number
+          total_sent?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_daily_limit?: number
+          days_active?: number
+          email_account_id?: string
+          id?: string
+          ramp_increment?: number
+          status?: Database["public"]["Enums"]["warmup_status"]
+          target_daily_limit?: number
+          total_received?: number
+          total_sent?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warmup_schedules_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +369,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      campaign_status: "draft" | "active" | "paused" | "completed"
+      followup_status: "pending" | "sent" | "cancelled" | "replied" | "failed"
+      lead_status:
+        | "imported"
+        | "active"
+        | "replied"
+        | "bounced"
+        | "unsubscribed"
+        | "duplicate"
+      warmup_status: "active" | "paused" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +505,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      campaign_status: ["draft", "active", "paused", "completed"],
+      followup_status: ["pending", "sent", "cancelled", "replied", "failed"],
+      lead_status: [
+        "imported",
+        "active",
+        "replied",
+        "bounced",
+        "unsubscribed",
+        "duplicate",
+      ],
+      warmup_status: ["active", "paused", "completed"],
+    },
   },
 } as const

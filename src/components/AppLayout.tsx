@@ -26,6 +26,7 @@ const navigation = [
   { name: "Campaigns", path: "/campaigns", icon: Zap },
   { name: "Templates", path: "/templates", icon: FileText },
   { name: "Warmup", path: "/warmup", icon: Flame },
+  { name: "Analytics", path: "/analytics", icon: BarChart3 },
   { name: "Settings", path: "/settings", icon: Settings },
 ];
 

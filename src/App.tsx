@@ -51,6 +51,7 @@ function AppRoutes() {
       <Route path="/leads" element={<PrivateRoute><AppLayout><LeadImport /></AppLayout></PrivateRoute>} />
       <Route path="/settings" element={<PrivateRoute><AppLayout><SettingsPage /></AppLayout></PrivateRoute>} />
       <Route path="/warmup" element={<PrivateRoute><AppLayout><WarmupPage /></AppLayout></PrivateRoute>} />
+      <Route path="/analytics" element={<PrivateRoute><AppLayout><AnalyticsPage /></AppLayout></PrivateRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

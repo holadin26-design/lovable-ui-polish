@@ -98,7 +98,7 @@ export default function Campaigns() {
   const openSteps = async (campaignId: string) => {
     setShowStepsDialog(campaignId);
     setStepsLoading(true);
-    const { data } = await supabase.from("campaign_steps").select("*").eq("campaign_id", campaignId).order("step_order");
+    const { data } = await (supabase as any).from("campaign_steps").select("*").eq("campaign_id", campaignId).order("step_order");
     setSteps(data || []);
     setStepsLoading(false);
   };

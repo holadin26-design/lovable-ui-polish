@@ -73,7 +73,7 @@ export default function Campaigns() {
     if (error) { toast.error(error.message); return; }
     // Create default first step
     if (data) {
-      await supabase.from("campaign_steps").insert({
+      await (supabase as any).from("campaign_steps").insert({
         campaign_id: data.id, user_id: user.id,
         step_order: 1, subject: "Initial outreach", body: "Hi {{name}},\n\n", delay_days: 0, variant_label: "A",
       });

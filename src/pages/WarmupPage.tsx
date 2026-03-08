@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { Flame, Play, Pause, TrendingUp, Mail, BarChart2, Plus, Trash2, Settings } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -19,11 +18,7 @@ export default function WarmupPage() {
   const [emailAccounts, setEmailAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newSchedule, setNewSchedule] = useState({
-    email_account_id: "",
-    target_daily_limit: 50,
-    ramp_increment: 3,
-  });
+  const [newSchedule, setNewSchedule] = useState({ email_account_id: "", target_daily_limit: 50, ramp_increment: 3 });
 
   useEffect(() => {
     if (user) loadData();
@@ -42,17 +37,12 @@ export default function WarmupPage() {
   const createSchedule = async () => {
     if (!user) return;
     const { error } = await supabase.from("warmup_schedules").insert({
-      user_id: user.id,
-      email_account_id: newSchedule.email_account_id,
-      target_daily_limit: newSchedule.target_daily_limit,
-      ramp_increment: newSchedule.ramp_increment,
+      user_id: user.id, email_account_id: newSchedule.email_account_id,
+      target_daily_limit: newSchedule.target_daily_limit, ramp_increment: newSchedule.ramp_increment,
     });
     if (error) { toast.error(error.message); return; }
-
-    // Enable warmup on the email account
     await supabase.from("email_accounts").update({ warmup_enabled: true }).eq("id", newSchedule.email_account_id);
-
-    toast.success("Warmup schedule created!");
+    toast.success("Warmup started");
     setShowCreateDialog(false);
     setNewSchedule({ email_account_id: "", target_daily_limit: 50, ramp_increment: 3 });
     loadData();
@@ -60,190 +50,132 @@ export default function WarmupPage() {
 
   const toggleStatus = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "paused" : "active";
-    const { error } = await supabase.from("warmup_schedules").update({ status: newStatus as any }).eq("id", id);
-    if (!error) { toast.success(`Warmup ${newStatus}`); loadData(); }
+    await supabase.from("warmup_schedules").update({ status: newStatus as any }).eq("id", id);
+    toast.success(`Warmup ${newStatus}`);
+    loadData();
   };
 
   const deleteSchedule = async (id: string) => {
-    const { error } = await supabase.from("warmup_schedules").delete().eq("id", id);
-    if (!error) { toast.success("Warmup schedule deleted"); loadData(); }
-  };
-
-  const statusColors: Record<string, string> = {
-    active: "text-success",
-    paused: "text-warning",
-    completed: "text-primary",
+    await supabase.from("warmup_schedules").delete().eq("id", id);
+    toast.success("Deleted");
+    loadData();
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">Email Warmup</h1>
-          <p className="text-muted-foreground mt-1">
-            Gradually increase sending volume and exchange warmup emails to build sender reputation.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Email Warmup</h1>
+          <p className="text-sm text-muted-foreground mt-1">Build sender reputation with gradual ramp-up.</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} disabled={emailAccounts.length === 0}>
-          <Plus className="mr-2 h-4 w-4" /> New Warmup Schedule
+        <Button size="sm" onClick={() => setShowCreateDialog(true)} disabled={emailAccounts.length === 0}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> New Schedule
         </Button>
       </div>
 
-      {/* Info Card */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="p-4 flex items-start gap-3">
-          <Flame className="h-5 w-5 text-primary mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-sm">How Warmup Works</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              <strong>Gradual Ramp-up:</strong> Starts with a low daily send limit and increases by your configured increment each day.
-              <br />
-              <strong>Warmup Exchanges:</strong> The system sends and receives warmup emails between your accounts to build deliverability and inbox reputation.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {emailAccounts.length === 0 && (
-        <Card className="border-warning/30 bg-warning/5">
-          <CardContent className="p-4 text-center">
-            <Settings className="h-6 w-6 text-warning mx-auto mb-2" />
-            <p className="font-medium">No email accounts configured</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Add an email account with SMTP/IMAP credentials in Settings first.
-            </p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => window.location.href = "/settings"}>
-              Go to Settings
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10">
-              <TrendingUp className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-display font-bold">{schedules.filter((s) => s.status === "active").length}</p>
-              <p className="text-sm text-muted-foreground">Active</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <Mail className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-display font-bold">{schedules.reduce((a, s) => a + s.total_sent, 0)}</p>
-              <p className="text-sm text-muted-foreground">Total Sent</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/20">
-              <BarChart2 className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div>
-              <p className="text-2xl font-display font-bold">{schedules.reduce((a, s) => a + s.total_received, 0)}</p>
-              <p className="text-sm text-muted-foreground">Total Received</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Info */}
+      <div className="rounded-lg border bg-primary/5 border-primary/15 p-4 flex items-start gap-3">
+        <Flame className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+        <div className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">How it works:</span> Gradually increases daily sending volume and exchanges warmup emails to improve inbox placement.
+        </div>
       </div>
 
-      {/* Schedule List */}
+      {emailAccounts.length === 0 && (
+        <div className="rounded-lg border border-warning/20 bg-warning/5 p-6 text-center">
+          <Settings className="h-5 w-5 text-warning mx-auto mb-2" />
+          <p className="text-sm font-medium">No email accounts</p>
+          <p className="text-xs text-muted-foreground mt-1">Add SMTP/IMAP credentials in Settings first.</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => window.location.href = "/settings"}>Go to Settings</Button>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card><CardContent className="p-4 flex items-center gap-3">
+          <TrendingUp className="h-4 w-4 text-success" />
+          <div><p className="text-lg font-semibold">{schedules.filter((s) => s.status === "active").length}</p><p className="text-[11px] text-muted-foreground">Active</p></div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3">
+          <Mail className="h-4 w-4 text-primary" />
+          <div><p className="text-lg font-semibold">{schedules.reduce((a, s) => a + s.total_sent, 0)}</p><p className="text-[11px] text-muted-foreground">Sent</p></div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3">
+          <BarChart2 className="h-4 w-4 text-muted-foreground" />
+          <div><p className="text-lg font-semibold">{schedules.reduce((a, s) => a + s.total_received, 0)}</p><p className="text-[11px] text-muted-foreground">Received</p></div>
+        </CardContent></Card>
+      </div>
+
+      {/* List */}
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading...</div>
+        <div className="text-center py-16 text-sm text-muted-foreground">Loading…</div>
       ) : schedules.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">
-          <Flame className="h-8 w-8 mx-auto mb-3 opacity-50" />
-          <p>No warmup schedules yet.</p>
+        <Card><CardContent className="py-16 text-center">
+          <Flame className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">No warmup schedules yet</p>
         </CardContent></Card>
       ) : (
-        <div className="space-y-4">
-          {schedules.map((schedule, i) => {
+        <div className="space-y-3">
+          {schedules.map((schedule) => {
             const progress = Math.min(100, (schedule.current_daily_limit / schedule.target_daily_limit) * 100);
             const accountEmail = (schedule.email_accounts as any)?.email || "Unknown";
             return (
-              <motion.div key={schedule.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Flame className={`h-5 w-5 ${statusColors[schedule.status] || "text-muted-foreground"}`} />
-                          <h3 className="font-display font-semibold">{accountEmail}</h3>
-                          <Badge variant={schedule.status === "active" ? "default" : "secondary"}>
-                            {schedule.status}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                          <span>Day {schedule.days_active}</span>
-                          <span>Current: {schedule.current_daily_limit}/day</span>
-                          <span>Target: {schedule.target_daily_limit}/day</span>
-                          <span>+{schedule.ramp_increment}/day</span>
-                        </div>
-                        <div className="mt-3 flex items-center gap-3">
-                          <Progress value={progress} className="h-2 flex-1" />
-                          <span className="text-sm font-medium text-muted-foreground w-10">{Math.round(progress)}%</span>
-                        </div>
-                        <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>Sent: {schedule.total_sent}</span>
-                          <span>Received: {schedule.total_received}</span>
-                        </div>
+              <Card key={schedule.id} className="hover:shadow-sm transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Flame className={`h-4 w-4 ${schedule.status === "active" ? "text-success" : "text-muted-foreground"}`} />
+                        <p className="text-sm font-medium">{accountEmail}</p>
+                        <Badge variant={schedule.status === "active" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                          {schedule.status}
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => toggleStatus(schedule.id, schedule.status)}>
-                          {schedule.status === "active" ? <><Pause className="mr-1.5 h-3.5 w-3.5" /> Pause</> : <><Play className="mr-1.5 h-3.5 w-3.5" /> Resume</>}
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteSchedule(schedule.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-2">
+                        <span>Day {schedule.days_active}</span>
+                        <span>{schedule.current_daily_limit}/{schedule.target_daily_limit} daily</span>
+                        <span>+{schedule.ramp_increment}/day</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Progress value={progress} className="h-1.5 flex-1" />
+                        <span className="text-[11px] text-muted-foreground w-8">{Math.round(progress)}%</span>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                    <div className="flex items-center gap-1.5">
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(schedule.id, schedule.status)}>
+                        {schedule.status === "active" ? <><Pause className="mr-1 h-3 w-3" /> Pause</> : <><Play className="mr-1 h-3 w-3" /> Resume</>}
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteSchedule(schedule.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             );
           })}
         </div>
       )}
 
-      {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
-          <DialogHeader><DialogTitle className="font-display">Create Warmup Schedule</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New Warmup Schedule</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Email Account</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email Account</Label>
               <Select value={newSchedule.email_account_id} onValueChange={(v) => setNewSchedule({ ...newSchedule, email_account_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Select email account" /></SelectTrigger>
-                <SelectContent>
-                  {emailAccounts.map((acc) => (
-                    <SelectItem key={acc.id} value={acc.id}>{acc.email}</SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>{emailAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.email}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Target Daily Limit</Label>
-              <Input type="number" value={newSchedule.target_daily_limit} onChange={(e) => setNewSchedule({ ...newSchedule, target_daily_limit: parseInt(e.target.value) || 50 })} />
-              <p className="text-xs text-muted-foreground">The maximum daily sends to ramp up to</p>
-            </div>
-            <div className="space-y-2">
-              <Label>Daily Ramp Increment</Label>
-              <Input type="number" value={newSchedule.ramp_increment} onChange={(e) => setNewSchedule({ ...newSchedule, ramp_increment: parseInt(e.target.value) || 3 })} />
-              <p className="text-xs text-muted-foreground">How many additional emails per day to add</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label className="text-xs">Target Daily Limit</Label><Input type="number" value={newSchedule.target_daily_limit} onChange={(e) => setNewSchedule({ ...newSchedule, target_daily_limit: parseInt(e.target.value) || 50 })} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Ramp +/day</Label><Input type="number" value={newSchedule.ramp_increment} onChange={(e) => setNewSchedule({ ...newSchedule, ramp_increment: parseInt(e.target.value) || 3 })} /></div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button onClick={createSchedule} disabled={!newSchedule.email_account_id}>Create Schedule</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
+            <Button size="sm" onClick={createSchedule} disabled={!newSchedule.email_account_id}>Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

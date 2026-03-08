@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS update_followups_updated_at ON public.followups;

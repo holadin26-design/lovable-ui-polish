@@ -2,3 +2,9 @@ project_id = "wgfrebkpxbptarbksdjg"
 
 [functions.validate-email]
 verify_jwt = false
+
+[functions.validate-leads]
+verify_jwt = false
+
+[functions.ai-research]
+verify_jwt = false

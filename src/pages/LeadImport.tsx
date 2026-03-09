@@ -27,6 +27,7 @@ const validationIcons: Record<string, { icon: typeof CheckCircle; color: string;
 export default function LeadImport() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<any[]>([]);
+  const [validationReasons, setValidationReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);

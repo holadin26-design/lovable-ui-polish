@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Mail, Plus, Trash2, CheckCircle, Shield } from "lucide-react";
+import { Mail, Plus, Trash2, CheckCircle, Shield, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -74,6 +75,12 @@ export default function SettingsPage() {
     loadAccounts();
   };
 
+  const resetSendsToday = async (id: string) => {
+    await supabase.from("email_accounts").update({ sends_today: 0 }).eq("id", id);
+    toast.success("Counter reset");
+    loadAccounts();
+  };
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
@@ -81,7 +88,6 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground mt-1">Manage your account and email connections.</p>
       </div>
 
-      {/* Auth */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
@@ -97,7 +103,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Email Accounts */}
       <Card>
         <CardHeader className="flex-row items-center justify-between py-4">
           <div>
@@ -119,29 +124,46 @@ export default function SettingsPage() {
             </div>
           ) : (
             emailAccounts.map((acc) => (
-              <div key={acc.id} className="flex items-center gap-3 rounded-lg border p-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                  {acc.email[0].toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium truncate">{acc.email}</p>
-                    {acc.is_primary && <Badge variant="default" className="text-[10px] px-1.5 py-0">Primary</Badge>}
+              <div key={acc.id} className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                    {acc.email[0].toUpperCase()}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {acc.smtp_host}:{acc.smtp_port} · {acc.imap_host}:{acc.imap_port}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium truncate">{acc.email}</p>
+                      {acc.is_primary && <Badge variant="default" className="text-[10px] px-1.5 py-0">Primary</Badge>}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {acc.smtp_host}:{acc.smtp_port} · {acc.imap_host}:{acc.imap_port}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => validateAccount(acc.id)} disabled={validating}>
+                      <CheckCircle className="mr-1 h-3 w-3" /> Test
+                    </Button>
+                    {!acc.is_primary && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setPrimary(acc.id)}>Primary</Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteAccount(acc.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => validateAccount(acc.id)} disabled={validating}>
-                    <CheckCircle className="mr-1 h-3 w-3" /> Test
-                  </Button>
-                  {!acc.is_primary && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setPrimary(acc.id)}>Primary</Button>
-                  )}
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteAccount(acc.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {/* Send limit progress */}
+                <div className="flex items-center gap-3 pl-11">
+                  <Activity className="h-3 w-3 text-muted-foreground shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] text-muted-foreground">
+                        {acc.sends_today} / {acc.daily_send_limit} sent today
+                      </span>
+                      <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => resetSendsToday(acc.id)}>
+                        Reset
+                      </Button>
+                    </div>
+                    <Progress value={acc.daily_send_limit > 0 ? (acc.sends_today / acc.daily_send_limit) * 100 : 0} className="h-1.5" />
+                  </div>
                 </div>
               </div>
             ))
@@ -152,7 +174,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Add Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Add Email Account</DialogTitle></DialogHeader>

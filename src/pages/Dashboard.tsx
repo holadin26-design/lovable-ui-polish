@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Send,
-  Clock,
-  CheckCircle,
-  TrendingUp,
-  AlertCircle,
-  ArrowUpRight,
-  Mail,
+  Send, Clock, CheckCircle, TrendingUp, AlertCircle, ArrowUpRight, Mail, Loader2, PlayCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "outline",
@@ -29,6 +24,7 @@ export default function Dashboard() {
   const [followups, setFollowups] = useState<any[]>([]);
   const [stats, setStats] = useState({ total: 0, pending: 0, replied: 0, sent: 0 });
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (user) loadData();
@@ -56,6 +52,20 @@ export default function Dashboard() {
     }
   };
 
+  const processQueue = async () => {
+    setProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-email");
+      if (error) throw error;
+      toast.success(`Processed: ${data?.processed || 0} sent, ${data?.failed || 0} failed`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process queue");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const missedFollowups = followups.filter(
     (f) => f.status === "pending" && new Date(f.scheduled_for) < new Date()
   );
@@ -74,6 +84,10 @@ export default function Dashboard() {
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">Overview of your email outreach performance.</p>
         </div>
+        <Button size="sm" onClick={processQueue} disabled={processing}>
+          {processing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="mr-1.5 h-3.5 w-3.5" />}
+          Process Queue
+        </Button>
       </div>
 
       {/* Stats */}
@@ -104,6 +118,10 @@ export default function Dashboard() {
                 </p>
               ))}
             </div>
+            <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={processQueue} disabled={processing}>
+              {processing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <PlayCircle className="mr-1 h-3 w-3" />}
+              Send Now
+            </Button>
           </div>
         </div>
       )}

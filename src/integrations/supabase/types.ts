@@ -234,6 +234,7 @@ export type Database = {
           created_at: string
           email_account_id: string | null
           id: string
+          lead_id: string | null
           max_attempts: number
           message_id: string | null
           recipient_email: string
@@ -253,6 +254,7 @@ export type Database = {
           created_at?: string
           email_account_id?: string | null
           id?: string
+          lead_id?: string | null
           max_attempts?: number
           message_id?: string | null
           recipient_email: string
@@ -272,6 +274,7 @@ export type Database = {
           created_at?: string
           email_account_id?: string | null
           id?: string
+          lead_id?: string | null
           max_attempts?: number
           message_id?: string | null
           recipient_email?: string
@@ -289,6 +292,13 @@ export type Database = {
             columns: ["email_account_id"]
             isOneToOne: false
             referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followups_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]

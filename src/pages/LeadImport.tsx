@@ -33,6 +33,7 @@ export default function LeadImport() {
   const [newLead, setNewLead] = useState({ email: "", name: "", company: "" });
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [validating, setValidating] = useState(false);
+  const [bulkValidating, setBulkValidating] = useState(false);
   const [researching, setResearching] = useState(false);
   const [offerDescription, setOfferDescription] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -160,6 +161,30 @@ export default function LeadImport() {
     if (file) handleFileUpload(file);
   };
 
+  // Bulk validate all unvalidated leads
+  const validateAllUnvalidated = async () => {
+    const unvalidated = leads.filter(l => !l.validation_status || l.validation_status === 'pending');
+    if (unvalidated.length === 0) { toast.info("All leads are already validated"); return; }
+    setBulkValidating(true);
+    try {
+      const ids = unvalidated.map(l => l.id);
+      // Process in batches of 50
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        const { data, error } = await supabase.functions.invoke("validate-leads", {
+          body: { lead_ids: batch },
+        });
+        if (error) throw error;
+      }
+      toast.success(`Validated ${ids.length} leads`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Bulk validation failed");
+    } finally {
+      setBulkValidating(false);
+    }
+  };
+
   // Batch validation
   const validateSelected = async () => {
     if (selectedLeads.size === 0) { toast.error("Select leads first"); return; }
@@ -247,6 +272,10 @@ export default function LeadImport() {
           <p className="text-sm text-muted-foreground mt-1">Import, validate, and enrich your leads with AI.</p>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={validateAllUnvalidated} disabled={bulkValidating}>
+            {bulkValidating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Shield className="mr-1.5 h-3.5 w-3.5" />}
+            {bulkValidating ? "Validating…" : "Validate All"}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setShowAddDialog(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Lead
           </Button>

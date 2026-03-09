@@ -8,3 +8,18 @@ verify_jwt = false
 
 [functions.ai-research]
 verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.track]
+verify_jwt = false
+
+[functions.check-replies]
+verify_jwt = false
+
+[functions.email-finder]
+verify_jwt = true
+
+[functions.unsubscribe]
+verify_jwt = false

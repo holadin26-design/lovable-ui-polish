@@ -19,6 +19,7 @@ import { toast } from "sonner";
 const validationIcons: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
   valid: { icon: CheckCircle, color: "text-success", label: "Valid" },
   invalid: { icon: ShieldX, color: "text-destructive", label: "Invalid" },
+  risky: { icon: AlertTriangle, color: "text-warning", label: "Risky" },
   catchall: { icon: ShieldAlert, color: "text-warning", label: "Catch-all" },
   pending: { icon: Clock, color: "text-muted-foreground", label: "Pending" },
 };

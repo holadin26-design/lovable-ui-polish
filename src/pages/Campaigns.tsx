@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Play, Pause, Users, Trash2, Zap, GripVertical, Copy, Rocket, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,12 +31,14 @@ type CampaignStep = {
 
 export default function Campaigns() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showStepsDialog, setShowStepsDialog] = useState<string | null>(null);
   const [newCampaign, setNewCampaign] = useState({ name: "", followup_delay_hours: 48, max_followups: 3 });
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
+  const [hasPrimaryEmailAccount, setHasPrimaryEmailAccount] = useState(true);
   const [templates, setTemplates] = useState<any[]>([]);
   const [steps, setSteps] = useState<CampaignStep[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
@@ -46,20 +49,46 @@ export default function Campaigns() {
   }, [user]);
 
   const loadData = async () => {
-    const [{ data }, { data: tmpl }] = await Promise.all([
+    if (!user) return;
+
+    const [{ data, error: campaignsError }, { data: tmpl }, { data: primaryAccount }] = await Promise.all([
       supabase.from("campaigns").select("*").order("created_at", { ascending: false }),
       supabase.from("templates").select("*"),
+      supabase
+        .from("email_accounts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_primary", true)
+        .maybeSingle(),
     ]);
+
+    if (campaignsError) {
+      toast.error(campaignsError.message);
+      setLoading(false);
+      return;
+    }
+
     setCampaigns(data || []);
     setTemplates(tmpl || []);
+    setHasPrimaryEmailAccount(Boolean(primaryAccount));
+
     if (data && data.length > 0) {
-      const counts: Record<string, number> = {};
-      for (const c of data) {
-        const { count } = await supabase.from("leads").select("*", { count: "exact", head: true }).eq("campaign_id", c.id);
-        counts[c.id] = count || 0;
-      }
-      setLeadCounts(counts);
+      const countEntries = await Promise.all(
+        data.map(async (campaign) => {
+          const { count } = await supabase
+            .from("leads")
+            .select("*", { count: "exact", head: true })
+            .eq("campaign_id", campaign.id);
+
+          return [campaign.id, count || 0] as const;
+        })
+      );
+
+      setLeadCounts(Object.fromEntries(countEntries));
+    } else {
+      setLeadCounts({});
     }
+
     setLoading(false);
   };
 
@@ -96,14 +125,18 @@ export default function Campaigns() {
   // Launch campaign: generate followups for all assigned leads
   const launchCampaign = async (campaignId: string) => {
     if (!user) return;
+
     setLaunching(campaignId);
+
     try {
       // Get campaign steps
-      const { data: campaignSteps } = await supabase
+      const { data: campaignSteps, error: stepsError } = await supabase
         .from("campaign_steps")
         .select("*")
         .eq("campaign_id", campaignId)
         .order("step_order");
+
+      if (stepsError) throw stepsError;
 
       if (!campaignSteps || campaignSteps.length === 0) {
         toast.error("Add at least one step to the sequence first");
@@ -111,38 +144,39 @@ export default function Campaigns() {
       }
 
       // Get assigned leads
-      const { data: leads } = await supabase
+      const { data: leads, error: leadsError } = await supabase
         .from("leads")
-        .select("*")
+        .select("id, email")
         .eq("campaign_id", campaignId)
         .in("status", ["imported", "active"]);
 
+      if (leadsError) throw leadsError;
+
       if (!leads || leads.length === 0) {
-        toast.error("No leads assigned to this campaign");
+        toast.error("No leads assigned to this campaign. Assign one from Lead Lists first.");
         return;
       }
 
-      // Get campaign for delay config
-      const { data: campaign } = await supabase
-        .from("campaigns")
-        .select("*")
-        .eq("id", campaignId)
-        .single();
-
-      if (!campaign) return;
-
-      // Get primary email account
-      const { data: emailAccount } = await supabase
+      // Ensure primary email account is configured before launch
+      const { data: emailAccount, error: accountError } = await supabase
         .from("email_accounts")
         .select("id")
         .eq("user_id", user.id)
         .eq("is_primary", true)
         .maybeSingle();
 
-      // Group steps by step_order, pick variant A for each (or random for A/B)
-      const stepsByOrder = campaignSteps.reduce((acc, s) => {
-        if (!acc[s.step_order]) acc[s.step_order] = [];
-        acc[s.step_order].push(s);
+      if (accountError) throw accountError;
+
+      if (!emailAccount?.id) {
+        toast.error("Add a primary email account in Settings before launching.");
+        navigate("/settings");
+        return;
+      }
+
+      // Group steps by step_order, pick random variant for each step
+      const stepsByOrder = campaignSteps.reduce((acc, step) => {
+        if (!acc[step.step_order]) acc[step.step_order] = [];
+        acc[step.step_order].push(step);
         return acc;
       }, {} as Record<number, any[]>);
 
@@ -153,9 +187,8 @@ export default function Campaigns() {
         let cumulativeDelay = 0;
 
         for (const [order, variants] of Object.entries(stepsByOrder).sort(([a], [b]) => Number(a) - Number(b))) {
-          // Pick random variant for A/B testing
           const step = variants[Math.floor(Math.random() * variants.length)];
-          cumulativeDelay += step.delay_days;
+          cumulativeDelay += Number(step.delay_days);
 
           const scheduledFor = new Date(now.getTime() + cumulativeDelay * 24 * 60 * 60 * 1000);
 
@@ -169,22 +202,31 @@ export default function Campaigns() {
             attempt_number: Number(order),
             max_attempts: Object.keys(stepsByOrder).length,
             lead_id: lead.id,
-            email_account_id: emailAccount?.id || null,
+            email_account_id: emailAccount.id,
           });
         }
-
-        // Update lead status to active
-        await supabase.from("leads").update({ status: "active" as any }).eq("id", lead.id);
       }
 
       // Batch insert followups
-      if (followups.length > 0) {
-        const { error } = await supabase.from("followups").insert(followups);
-        if (error) { toast.error(error.message); return; }
-      }
+      const { error: insertError } = await supabase.from("followups").insert(followups);
+      if (insertError) throw insertError;
+
+      // Bulk update lead statuses
+      const leadIds = leads.map((lead) => lead.id);
+      const { error: updateLeadsError } = await supabase
+        .from("leads")
+        .update({ status: "active" as any })
+        .in("id", leadIds);
+
+      if (updateLeadsError) throw updateLeadsError;
 
       // Set campaign to active
-      await supabase.from("campaigns").update({ status: "active" as any }).eq("id", campaignId);
+      const { error: updateCampaignError } = await supabase
+        .from("campaigns")
+        .update({ status: "active" as any })
+        .eq("id", campaignId);
+
+      if (updateCampaignError) throw updateCampaignError;
 
       toast.success(`Launched! ${followups.length} emails queued for ${leads.length} leads`);
       loadData();
@@ -301,7 +343,14 @@ export default function Campaigns() {
                       Sequence
                     </Button>
                     {campaign.status === "draft" && (
-                      <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => launchCampaign(campaign.id)} disabled={launching === campaign.id}>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        onClick={() => launchCampaign(campaign.id)}
+                        disabled={launching === campaign.id || (leadCounts[campaign.id] || 0) === 0 || !hasPrimaryEmailAccount}
+                        title={!hasPrimaryEmailAccount ? "Add a primary email account in Settings first" : (leadCounts[campaign.id] || 0) === 0 ? "Assign at least one lead first" : "Launch campaign"}
+                      >
                         {launching === campaign.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Rocket className="mr-1 h-3 w-3" />}
                         Launch
                       </Button>

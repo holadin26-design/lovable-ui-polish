@@ -200,10 +200,15 @@ export default function LeadImport() {
   };
 
   const assignToCampaign = async (campaignId: string) => {
-    if (selectedLeads.size === 0) return;
+    if (selectedLeads.size === 0) {
+      toast.error("Select at least one lead first");
+      return;
+    }
+
     for (const id of selectedLeads) {
       await supabase.from("leads").update({ campaign_id: campaignId, status: "active" as any }).eq("id", id);
     }
+
     toast.success(`${selectedLeads.size} leads assigned`);
     setSelectedLeads(new Set());
     loadData();

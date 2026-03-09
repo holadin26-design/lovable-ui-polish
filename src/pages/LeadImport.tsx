@@ -33,6 +33,7 @@ export default function LeadImport() {
   const [newLead, setNewLead] = useState({ email: "", name: "", company: "" });
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [validating, setValidating] = useState(false);
+  const [bulkValidating, setBulkValidating] = useState(false);
   const [researching, setResearching] = useState(false);
   const [offerDescription, setOfferDescription] = useState("");
   const [searchQuery, setSearchQuery] = useState("");

@@ -248,6 +248,10 @@ export default function LeadImport() {
           <p className="text-sm text-muted-foreground mt-1">Import, validate, and enrich your leads with AI.</p>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={validateAllUnvalidated} disabled={bulkValidating}>
+            {bulkValidating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Shield className="mr-1.5 h-3.5 w-3.5" />}
+            {bulkValidating ? "Validating…" : "Validate All"}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setShowAddDialog(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Lead
           </Button>

@@ -52,12 +52,16 @@ export default function LeadImport() {
   }, [user]);
 
   const loadData = async () => {
-    const [{ data: l }, { data: c }] = await Promise.all([
+    const [{ data: l }, { data: c }, { data: v }] = await Promise.all([
       supabase.from("leads").select("*").order("created_at", { ascending: false }),
       supabase.from("campaigns").select("id, name"),
+      supabase.from("email_validations").select("lead_id, reason"),
     ]);
     setLeads(l || []);
     setCampaigns(c || []);
+    const reasons: Record<string, string> = {};
+    (v || []).forEach((ev: any) => { if (ev.reason) reasons[ev.lead_id] = ev.reason; });
+    setValidationReasons(reasons);
     setLoading(false);
   };
 

@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { BarChart3, TrendingUp, Mail, MousePointerClick, Reply, AlertTriangle, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
@@ -13,7 +12,7 @@ export default function AnalyticsPage() {
   const { user } = useAuth();
   const [followups, setFollowups] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [selectedCampaign, setSelectedCampaign] = useState("all");
+  const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,45 +20,54 @@ export default function AnalyticsPage() {
   }, [user]);
 
   const loadData = async () => {
-    const [{ data: fups }, { data: camps }] = await Promise.all([
+    const [{ data: fups }, { data: camps }, { data: events }] = await Promise.all([
       supabase.from("followups").select("*").order("created_at", { ascending: true }),
       supabase.from("campaigns").select("*").order("created_at", { ascending: false }),
+      supabase.from("tracking_events").select("*").order("created_at", { ascending: true }),
     ]);
     setFollowups(fups || []);
     setCampaigns(camps || []);
+    setTrackingEvents(events || []);
     setLoading(false);
   };
 
-  // Stats
+  // Real tracking stats from tracking_events table
   const total = followups.length;
   const sent = followups.filter(f => f.status === "sent" || f.status === "replied").length;
-  const opens = followups.reduce((a, f) => a + (f.opens || 0), 0);
-  const clicks = followups.reduce((a, f) => a + (f.clicks || 0), 0);
+  const opens = trackingEvents.filter(e => e.event_type === "open").length;
+  const clicks = trackingEvents.filter(e => e.event_type === "click").length;
   const replied = followups.filter(f => f.status === "replied").length;
   const bounced = followups.filter(f => f.status === "failed").length;
+  const unsubscribes = trackingEvents.filter(e => e.event_type === "unsubscribe").length;
 
   const openRate = sent > 0 ? ((opens / sent) * 100).toFixed(1) : "0";
   const clickRate = sent > 0 ? ((clicks / sent) * 100).toFixed(1) : "0";
   const replyRate = sent > 0 ? ((replied / sent) * 100).toFixed(1) : "0";
   const bounceRate = total > 0 ? ((bounced / total) * 100).toFixed(1) : "0";
 
-  // Status distribution for pie chart
+  // Status distribution
   const statusCounts = followups.reduce((acc, f) => {
     acc[f.status] = (acc[f.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-
   const pieData = Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
 
-  // Daily send volume for line chart
+  // Daily send volume
   const dailyData = followups.reduce((acc, f) => {
     const date = new Date(f.scheduled_for).toLocaleDateString();
     if (!acc[date]) acc[date] = { date, sent: 0, replied: 0, opens: 0 };
     if (f.status === "sent" || f.status === "replied") acc[date].sent++;
     if (f.status === "replied") acc[date].replied++;
-    acc[date].opens += f.opens || 0;
     return acc;
   }, {} as Record<string, any>);
+
+  // Add opens per day from tracking events
+  for (const event of trackingEvents) {
+    if (event.event_type === "open") {
+      const date = new Date(event.created_at).toLocaleDateString();
+      if (dailyData[date]) dailyData[date].opens++;
+    }
+  }
 
   const lineData = Object.values(dailyData).slice(-30);
 
@@ -84,8 +92,10 @@ export default function AnalyticsPage() {
 
   const exportCSV = () => {
     const headers = "Email,Subject,Status,Scheduled,Sent At,Opens,Clicks\n";
-    const rows = followups.map(f => 
-      `"${f.recipient_email}","${f.subject}","${f.status}","${f.scheduled_for}","${f.sent_at || ''}","${f.opens || 0}","${f.clicks || 0}"`
+    const followupOpens = (fid: string) => trackingEvents.filter(e => e.followup_id === fid && e.event_type === "open").length;
+    const followupClicks = (fid: string) => trackingEvents.filter(e => e.followup_id === fid && e.event_type === "click").length;
+    const rows = followups.map(f =>
+      `"${f.recipient_email}","${f.subject}","${f.status}","${f.scheduled_for}","${f.sent_at || ''}","${followupOpens(f.id)}","${followupClicks(f.id)}"`
     ).join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -107,7 +117,6 @@ export default function AnalyticsPage() {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {statCards.map((stat) => (
           <Card key={stat.label}>
@@ -123,9 +132,7 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
-      {/* Charts row */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Send volume over time */}
         <Card className="lg:col-span-2">
           <CardHeader className="py-4">
             <CardTitle className="text-sm font-medium">Send Volume (Last 30 Days)</CardTitle>
@@ -140,12 +147,12 @@ export default function AnalyticsPage() {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Line type="monotone" dataKey="sent" stroke="hsl(221, 83%, 53%)" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="replied" stroke="hsl(142, 71%, 45%)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="opens" stroke="hsl(38, 92%, 50%)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Status distribution */}
         <Card>
           <CardHeader className="py-4">
             <CardTitle className="text-sm font-medium">Status Distribution</CardTitle>
@@ -167,7 +174,6 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Campaign comparison */}
       {campaignData.length > 0 && (
         <Card>
           <CardHeader className="py-4">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Play, Pause, Users, Trash2, Zap, GripVertical, ChevronDown, ChevronUp, Copy } from "lucide-react";
+import { Plus, Play, Pause, Users, Trash2, Zap, GripVertical, Copy, Rocket, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -40,6 +39,7 @@ export default function Campaigns() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [steps, setSteps] = useState<CampaignStep[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
+  const [launching, setLaunching] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) loadData();
@@ -71,9 +71,8 @@ export default function Campaigns() {
       max_followups: newCampaign.max_followups,
     }).select().single();
     if (error) { toast.error(error.message); return; }
-    // Create default first step
     if (data) {
-      await (supabase as any).from("campaign_steps").insert({
+      await supabase.from("campaign_steps").insert({
         campaign_id: data.id, user_id: user.id,
         step_order: 1, subject: "Initial outreach", body: "Hi {{name}},\n\n", delay_days: 0, variant_label: "A",
       });
@@ -94,36 +93,126 @@ export default function Campaigns() {
     if (!error) { toast.success("Campaign deleted"); loadData(); }
   };
 
+  // Launch campaign: generate followups for all assigned leads
+  const launchCampaign = async (campaignId: string) => {
+    if (!user) return;
+    setLaunching(campaignId);
+    try {
+      // Get campaign steps
+      const { data: campaignSteps } = await supabase
+        .from("campaign_steps")
+        .select("*")
+        .eq("campaign_id", campaignId)
+        .order("step_order");
+
+      if (!campaignSteps || campaignSteps.length === 0) {
+        toast.error("Add at least one step to the sequence first");
+        return;
+      }
+
+      // Get assigned leads
+      const { data: leads } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("campaign_id", campaignId)
+        .in("status", ["imported", "active"]);
+
+      if (!leads || leads.length === 0) {
+        toast.error("No leads assigned to this campaign");
+        return;
+      }
+
+      // Get campaign for delay config
+      const { data: campaign } = await supabase
+        .from("campaigns")
+        .select("*")
+        .eq("id", campaignId)
+        .single();
+
+      if (!campaign) return;
+
+      // Get primary email account
+      const { data: emailAccount } = await supabase
+        .from("email_accounts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_primary", true)
+        .maybeSingle();
+
+      // Group steps by step_order, pick variant A for each (or random for A/B)
+      const stepsByOrder = campaignSteps.reduce((acc, s) => {
+        if (!acc[s.step_order]) acc[s.step_order] = [];
+        acc[s.step_order].push(s);
+        return acc;
+      }, {} as Record<number, any[]>);
+
+      const followups: any[] = [];
+      const now = new Date();
+
+      for (const lead of leads) {
+        let cumulativeDelay = 0;
+
+        for (const [order, variants] of Object.entries(stepsByOrder).sort(([a], [b]) => Number(a) - Number(b))) {
+          // Pick random variant for A/B testing
+          const step = variants[Math.floor(Math.random() * variants.length)];
+          cumulativeDelay += step.delay_days;
+
+          const scheduledFor = new Date(now.getTime() + cumulativeDelay * 24 * 60 * 60 * 1000);
+
+          followups.push({
+            user_id: user.id,
+            recipient_email: lead.email,
+            subject: step.subject,
+            body: step.body,
+            scheduled_for: scheduledFor.toISOString(),
+            status: "pending",
+            attempt_number: Number(order),
+            max_attempts: Object.keys(stepsByOrder).length,
+            lead_id: lead.id,
+            email_account_id: emailAccount?.id || null,
+          });
+        }
+
+        // Update lead status to active
+        await supabase.from("leads").update({ status: "active" as any }).eq("id", lead.id);
+      }
+
+      // Batch insert followups
+      if (followups.length > 0) {
+        const { error } = await supabase.from("followups").insert(followups);
+        if (error) { toast.error(error.message); return; }
+      }
+
+      // Set campaign to active
+      await supabase.from("campaigns").update({ status: "active" as any }).eq("id", campaignId);
+
+      toast.success(`Launched! ${followups.length} emails queued for ${leads.length} leads`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Launch failed");
+    } finally {
+      setLaunching(null);
+    }
+  };
+
   // Steps management
   const openSteps = async (campaignId: string) => {
     setShowStepsDialog(campaignId);
     setStepsLoading(true);
-    const { data } = await (supabase as any).from("campaign_steps").select("*").eq("campaign_id", campaignId).order("step_order");
+    const { data } = await supabase.from("campaign_steps").select("*").eq("campaign_id", campaignId).order("step_order");
     setSteps(data || []);
     setStepsLoading(false);
   };
 
   const addStep = () => {
-    setSteps([...steps, {
-      step_order: steps.length + 1,
-      subject: "",
-      body: "",
-      delay_days: 3,
-      variant_label: "A",
-    }]);
+    setSteps([...steps, { step_order: steps.length + 1, subject: "", body: "", delay_days: 3, variant_label: "A" }]);
   };
 
   const addVariant = (stepOrder: number) => {
     const variants = steps.filter(s => s.step_order === stepOrder);
     const nextLabel = String.fromCharCode(65 + variants.length);
     const baseStep = variants[0];
-    setSteps([...steps, {
-      step_order: stepOrder,
-      subject: baseStep.subject,
-      body: baseStep.body,
-      delay_days: baseStep.delay_days,
-      variant_label: nextLabel,
-    }]);
+    setSteps([...steps, { step_order: stepOrder, subject: baseStep.subject, body: baseStep.body, delay_days: baseStep.delay_days, variant_label: nextLabel }]);
   };
 
   const updateStep = (index: number, field: string, value: any) => {
@@ -138,20 +227,13 @@ export default function Campaigns() {
 
   const saveSteps = async () => {
     if (!showStepsDialog || !user) return;
-    // Delete existing steps
-    await (supabase as any).from("campaign_steps").delete().eq("campaign_id", showStepsDialog);
-    // Insert new steps
+    await supabase.from("campaign_steps").delete().eq("campaign_id", showStepsDialog);
     const inserts = steps.map(s => ({
-      campaign_id: showStepsDialog,
-      user_id: user.id,
-      step_order: s.step_order,
-      subject: s.subject,
-      body: s.body,
-      delay_days: s.delay_days,
-      variant_label: s.variant_label,
+      campaign_id: showStepsDialog, user_id: user.id,
+      step_order: s.step_order, subject: s.subject, body: s.body, delay_days: s.delay_days, variant_label: s.variant_label,
     }));
     if (inserts.length > 0) {
-      const { error } = await (supabase as any).from("campaign_steps").insert(inserts);
+      const { error } = await supabase.from("campaign_steps").insert(inserts);
       if (error) { toast.error(error.message); return; }
     }
     toast.success("Sequence saved");
@@ -166,7 +248,6 @@ export default function Campaigns() {
     }
   };
 
-  // Group steps by step_order for display
   const groupedSteps = steps.reduce((acc, step, idx) => {
     const key = step.step_order;
     if (!acc[key]) acc[key] = [];
@@ -220,8 +301,9 @@ export default function Campaigns() {
                       Sequence
                     </Button>
                     {campaign.status === "draft" && (
-                      <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => updateStatus(campaign.id, "active")}>
-                        <Play className="mr-1 h-3 w-3" /> Launch
+                      <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => launchCampaign(campaign.id)} disabled={launching === campaign.id}>
+                        {launching === campaign.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Rocket className="mr-1 h-3 w-3" />}
+                        Launch
                       </Button>
                     )}
                     {campaign.status === "active" && (
@@ -267,7 +349,6 @@ export default function Campaigns() {
       <Dialog open={!!showStepsDialog} onOpenChange={() => setShowStepsDialog(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Email Sequence Builder</DialogTitle></DialogHeader>
-          
           {stepsLoading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
           ) : (
@@ -279,9 +360,7 @@ export default function Campaigns() {
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Step {order}</span>
                       {Number(order) > 1 && (
-                        <Badge variant="outline" className="text-[10px]">
-                          +{variants[0].delay_days}d delay
-                        </Badge>
+                        <Badge variant="outline" className="text-[10px]">+{variants[0].delay_days}d delay</Badge>
                       )}
                     </div>
                     {variants.length < 3 && (
@@ -290,13 +369,10 @@ export default function Campaigns() {
                       </Button>
                     )}
                   </div>
-
                   {variants.map((step) => (
                     <div key={step._index} className="space-y-2 pl-6 border-l-2 border-muted ml-2">
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-[10px] px-1.5">
-                          Variant {step.variant_label}
-                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] px-1.5">Variant {step.variant_label}</Badge>
                         {templates.length > 0 && (
                           <Select onValueChange={(v) => applyTemplate(step._index, v)}>
                             <SelectTrigger className="h-6 text-[11px] w-auto min-w-[120px]">
@@ -324,11 +400,9 @@ export default function Campaigns() {
                   ))}
                 </div>
               ))}
-
               <Button variant="outline" size="sm" className="w-full" onClick={addStep}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Step
               </Button>
-
               <div className="rounded-md bg-muted/50 p-3">
                 <p className="text-[11px] text-muted-foreground">
                   <span className="font-medium text-foreground">Variables:</span> {"{{name}}"}, {"{{company}}"}, {"{{email}}"}, {"{{personalized_line}}"}, or any custom field from your CSV import.
@@ -336,7 +410,6 @@ export default function Campaigns() {
               </div>
             </div>
           )}
-
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setShowStepsDialog(null)}>Cancel</Button>
             <Button size="sm" onClick={saveSteps}>Save Sequence</Button>

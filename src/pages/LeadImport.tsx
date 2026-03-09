@@ -388,9 +388,20 @@ export default function LeadImport() {
                       <TableCell className="text-sm text-muted-foreground">{lead.name || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center gap-1 text-[11px] ${valConfig.color}`}>
-                          <ValIcon className="h-3 w-3" /> {valConfig.label}
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`inline-flex items-center gap-1 text-[11px] cursor-default ${valConfig.color}`}>
+                                <ValIcon className="h-3 w-3" /> {valConfig.label}
+                              </span>
+                            </TooltipTrigger>
+                            {validationReasons[lead.id] && (
+                              <TooltipContent>
+                                <p className="text-xs max-w-[200px]">{validationReasons[lead.id]}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell>
                         {lead.ai_relevancy_score ? (

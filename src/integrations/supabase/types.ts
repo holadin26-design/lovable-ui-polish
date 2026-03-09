@@ -181,6 +181,7 @@ export type Database = {
           is_disposable: boolean
           lead_id: string
           mx_valid: boolean
+          reason: string | null
           status: string
           syntax_valid: boolean
           updated_at: string
@@ -195,6 +196,7 @@ export type Database = {
           is_disposable?: boolean
           lead_id: string
           mx_valid?: boolean
+          reason?: string | null
           status: string
           syntax_valid?: boolean
           updated_at?: string
@@ -209,6 +211,7 @@ export type Database = {
           is_disposable?: boolean
           lead_id?: string
           mx_valid?: boolean
+          reason?: string | null
           status?: string
           syntax_valid?: boolean
           updated_at?: string

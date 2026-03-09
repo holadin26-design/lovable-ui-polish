@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, FileText, Users, Trash2, CheckCircle, Plus, Shield, ShieldAlert, ShieldX, Clock, Brain, Loader2, Search } from "lucide-react";
+import { Upload, FileText, Users, Trash2, CheckCircle, Plus, Shield, ShieldAlert, ShieldX, Clock, Brain, Loader2, Search, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 const validationIcons: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
   valid: { icon: CheckCircle, color: "text-success", label: "Valid" },
   invalid: { icon: ShieldX, color: "text-destructive", label: "Invalid" },
+  risky: { icon: AlertTriangle, color: "text-warning", label: "Risky" },
   catchall: { icon: ShieldAlert, color: "text-warning", label: "Catch-all" },
   pending: { icon: Clock, color: "text-muted-foreground", label: "Pending" },
 };
@@ -25,6 +27,7 @@ const validationIcons: Record<string, { icon: typeof CheckCircle; color: string;
 export default function LeadImport() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<any[]>([]);
+  const [validationReasons, setValidationReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -49,12 +52,16 @@ export default function LeadImport() {
   }, [user]);
 
   const loadData = async () => {
-    const [{ data: l }, { data: c }] = await Promise.all([
+    const [{ data: l }, { data: c }, { data: v }] = await Promise.all([
       supabase.from("leads").select("*").order("created_at", { ascending: false }),
       supabase.from("campaigns").select("id, name"),
+      supabase.from("email_validations").select("lead_id, reason"),
     ]);
     setLeads(l || []);
     setCampaigns(c || []);
+    const reasons: Record<string, string> = {};
+    (v || []).forEach((ev: any) => { if (ev.reason) reasons[ev.lead_id] = ev.reason; });
+    setValidationReasons(reasons);
     setLoading(false);
   };
 
@@ -381,9 +388,20 @@ export default function LeadImport() {
                       <TableCell className="text-sm text-muted-foreground">{lead.name || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center gap-1 text-[11px] ${valConfig.color}`}>
-                          <ValIcon className="h-3 w-3" /> {valConfig.label}
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`inline-flex items-center gap-1 text-[11px] cursor-default ${valConfig.color}`}>
+                                <ValIcon className="h-3 w-3" /> {valConfig.label}
+                              </span>
+                            </TooltipTrigger>
+                            {validationReasons[lead.id] && (
+                              <TooltipContent>
+                                <p className="text-xs max-w-[200px]">{validationReasons[lead.id]}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell>
                         {lead.ai_relevancy_score ? (

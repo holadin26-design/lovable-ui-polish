@@ -466,15 +466,15 @@ export default function Campaigns() {
 
       {/* CSV Column Mapping Dialog */}
       <Dialog open={!!showMappingDialog} onOpenChange={() => setShowMappingDialog(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Map CSV Columns</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Found {csvRows.length} rows. Map columns to fields:</p>
-          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
+          <DialogHeader><DialogTitle className="text-center">Map CSV Columns</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground text-center">Found {csvRows.length} rows. Map columns to fields:</p>
+          <div className="space-y-3 overflow-y-auto flex-1 pr-1">
             {csvHeaders.map((header, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="text-sm min-w-[120px] truncate font-medium">{header}</span>
+              <div key={i} className="grid grid-cols-2 items-center gap-4">
+                <span className="text-sm truncate font-medium text-right">{header}</span>
                 <Select value={columnMapping[String(i)] || "skip"} onValueChange={(v) => setColumnMapping({ ...columnMapping, [String(i)]: v })}>
-                  <SelectTrigger className="h-8 text-xs flex-1">
+                  <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -488,12 +488,12 @@ export default function Campaigns() {
             ))}
           </div>
           {csvRows.length > 0 && (
-            <div className="rounded-md bg-muted/50 p-2">
+            <div className="rounded-md bg-muted/50 p-2 mt-2">
               <p className="text-[11px] text-muted-foreground font-medium mb-1">Preview (first row):</p>
               <p className="text-[11px] text-muted-foreground truncate">{csvRows[0].join(" | ")}</p>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="mt-2">
             <Button variant="outline" size="sm" onClick={() => setShowMappingDialog(null)}>Cancel</Button>
             <Button size="sm" onClick={importMappedCSV} disabled={!Object.values(columnMapping).includes("email")}>
               Import {csvRows.length} Leads

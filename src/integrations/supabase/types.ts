@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_steps: {
+        Row: {
+          body: string
+          campaign_id: string
+          created_at: string
+          delay_days: number
+          id: string
+          step_order: number
+          subject: string
+          updated_at: string
+          user_id: string
+          variant_label: string
+        }
+        Insert: {
+          body?: string
+          campaign_id: string
+          created_at?: string
+          delay_days?: number
+          id?: string
+          step_order: number
+          subject?: string
+          updated_at?: string
+          user_id: string
+          variant_label?: string
+        }
+        Update: {
+          body?: string
+          campaign_id?: string
+          created_at?: string
+          delay_days?: number
+          id?: string
+          step_order?: number
+          subject?: string
+          updated_at?: string
+          user_id?: string
+          variant_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_steps_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           created_at: string
@@ -125,6 +172,59 @@ export type Database = {
         }
         Relationships: []
       }
+      email_validations: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_catchall: boolean
+          is_disposable: boolean
+          lead_id: string
+          mx_valid: boolean
+          status: string
+          syntax_valid: boolean
+          updated_at: string
+          user_id: string
+          validated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_catchall?: boolean
+          is_disposable?: boolean
+          lead_id: string
+          mx_valid?: boolean
+          status: string
+          syntax_valid?: boolean
+          updated_at?: string
+          user_id: string
+          validated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_catchall?: boolean
+          is_disposable?: boolean
+          lead_id?: string
+          mx_valid?: boolean
+          status?: string
+          syntax_valid?: boolean
+          updated_at?: string
+          user_id?: string
+          validated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_validations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       followups: {
         Row: {
           attempt_number: number
@@ -195,6 +295,11 @@ export type Database = {
       }
       leads: {
         Row: {
+          ai_pain_points: string[]
+          ai_personalized_line: string | null
+          ai_relevancy_score: number | null
+          ai_researched_at: string | null
+          ai_summary: string | null
           campaign_id: string | null
           company: string | null
           created_at: string
@@ -205,8 +310,14 @@ export type Database = {
           status: Database["public"]["Enums"]["lead_status"]
           updated_at: string
           user_id: string
+          validation_status: string | null
         }
         Insert: {
+          ai_pain_points?: string[]
+          ai_personalized_line?: string | null
+          ai_relevancy_score?: number | null
+          ai_researched_at?: string | null
+          ai_summary?: string | null
           campaign_id?: string | null
           company?: string | null
           created_at?: string
@@ -217,8 +328,14 @@ export type Database = {
           status?: Database["public"]["Enums"]["lead_status"]
           updated_at?: string
           user_id: string
+          validation_status?: string | null
         }
         Update: {
+          ai_pain_points?: string[]
+          ai_personalized_line?: string | null
+          ai_relevancy_score?: number | null
+          ai_researched_at?: string | null
+          ai_summary?: string | null
           campaign_id?: string | null
           company?: string | null
           created_at?: string
@@ -229,6 +346,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["lead_status"]
           updated_at?: string
           user_id?: string
+          validation_status?: string | null
         }
         Relationships: [
           {

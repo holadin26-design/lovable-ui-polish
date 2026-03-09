@@ -24,15 +24,13 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claimsData.claims.sub;
     const { email_account_id } = await req.json();
 
     if (!email_account_id) {
@@ -46,7 +44,7 @@ Deno.serve(async (req) => {
       .from('email_accounts')
       .select('*')
       .eq('id', email_account_id)
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .single();
 
     if (fetchError || !account) {
@@ -68,7 +66,6 @@ Deno.serve(async (req) => {
         port: account.smtp_port,
       });
       
-      // Read the greeting
       const buf = new Uint8Array(1024);
       await smtpConn.read(buf);
       const greeting = new TextDecoder().decode(buf);

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Play, Pause, Users, Trash2, Zap, GripVertical, Copy, Rocket, Loader2 } from "lucide-react";
+import { Plus, Play, Pause, Users, Trash2, Zap, GripVertical, Copy, Rocket, Loader2, Upload, FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,16 @@ export default function Campaigns() {
   const [stepsLoading, setStepsLoading] = useState(false);
   const [launching, setLaunching] = useState<string | null>(null);
 
+  // Lead upload state
+  const [showUploadDialog, setShowUploadDialog] = useState<string | null>(null);
+  const [showAddLeadDialog, setShowAddLeadDialog] = useState<string | null>(null);
+  const [newLead, setNewLead] = useState({ email: "", name: "", company: "" });
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvRows, setCsvRows] = useState<string[][]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [showMappingDialog, setShowMappingDialog] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (user) loadData();
   }, [user]);
@@ -79,11 +89,9 @@ export default function Campaigns() {
             .from("leads")
             .select("*", { count: "exact", head: true })
             .eq("campaign_id", campaign.id);
-
           return [campaign.id, count || 0] as const;
         })
       );
-
       setLeadCounts(Object.fromEntries(countEntries));
     } else {
       setLeadCounts({});
@@ -122,58 +130,94 @@ export default function Campaigns() {
     if (!error) { toast.success("Campaign deleted"); loadData(); }
   };
 
-  // Launch campaign: generate followups for all assigned leads
+  // --- Lead upload helpers ---
+  const addLeadToCampaign = async () => {
+    if (!user || !showAddLeadDialog) return;
+    const { error } = await supabase.from("leads").insert({
+      user_id: user.id,
+      email: newLead.email,
+      name: newLead.name || null,
+      company: newLead.company || null,
+      campaign_id: showAddLeadDialog,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Lead added to campaign");
+    setShowAddLeadDialog(null);
+    setNewLead({ email: "", name: "", company: "" });
+    loadData();
+  };
+
+  const handleCSVFile = (file: File, campaignId: string) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split("\n").filter((l) => l.trim());
+      if (lines.length < 2) { toast.error("CSV needs a header and data rows"); return; }
+      const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+      const rows = lines.slice(1).map((line) => line.split(",").map((c) => c.trim().replace(/^"|"$/g, "")));
+
+      setCsvHeaders(headers);
+      setCsvRows(rows);
+
+      // Auto-detect mappings
+      const mapping: Record<string, string> = {};
+      headers.forEach((h, i) => {
+        const lower = h.toLowerCase();
+        if (lower.includes("email")) mapping[String(i)] = "email";
+        else if (lower.includes("name")) mapping[String(i)] = "name";
+        else if (lower.includes("company") || lower.includes("org")) mapping[String(i)] = "company";
+      });
+      setColumnMapping(mapping);
+      setShowUploadDialog(null);
+      setShowMappingDialog(campaignId);
+    };
+    reader.readAsText(file);
+  };
+
+  const importMappedCSV = async () => {
+    if (!user || !showMappingDialog) return;
+    const emailColIdx = Object.entries(columnMapping).find(([_, v]) => v === "email")?.[0];
+    if (!emailColIdx) { toast.error("Map at least the email column"); return; }
+
+    const nameColIdx = Object.entries(columnMapping).find(([_, v]) => v === "name")?.[0];
+    const companyColIdx = Object.entries(columnMapping).find(([_, v]) => v === "company")?.[0];
+
+    const newLeads = csvRows.map((row) => ({
+      user_id: user.id,
+      email: row[Number(emailColIdx)] || "",
+      name: nameColIdx ? row[Number(nameColIdx)] || null : null,
+      company: companyColIdx ? row[Number(companyColIdx)] || null : null,
+      campaign_id: showMappingDialog,
+    })).filter((l) => l.email && l.email.includes("@"));
+
+    if (newLeads.length === 0) { toast.error("No valid emails found"); return; }
+    const { error } = await supabase.from("leads").insert(newLeads);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${newLeads.length} leads imported to campaign`);
+    setShowMappingDialog(null);
+    loadData();
+  };
+
+  // Launch campaign
   const launchCampaign = async (campaignId: string) => {
     if (!user) return;
-
     setLaunching(campaignId);
-
     try {
-      // Get campaign steps
       const { data: campaignSteps, error: stepsError } = await supabase
-        .from("campaign_steps")
-        .select("*")
-        .eq("campaign_id", campaignId)
-        .order("step_order");
-
+        .from("campaign_steps").select("*").eq("campaign_id", campaignId).order("step_order");
       if (stepsError) throw stepsError;
+      if (!campaignSteps || campaignSteps.length === 0) { toast.error("Add at least one step to the sequence first"); return; }
 
-      if (!campaignSteps || campaignSteps.length === 0) {
-        toast.error("Add at least one step to the sequence first");
-        return;
-      }
-
-      // Get assigned leads
       const { data: leads, error: leadsError } = await supabase
-        .from("leads")
-        .select("id, email")
-        .eq("campaign_id", campaignId)
-        .in("status", ["imported", "active"]);
-
+        .from("leads").select("id, email").eq("campaign_id", campaignId).in("status", ["imported", "active"]);
       if (leadsError) throw leadsError;
+      if (!leads || leads.length === 0) { toast.error("No leads assigned. Upload leads first."); return; }
 
-      if (!leads || leads.length === 0) {
-        toast.error("No leads assigned to this campaign. Assign one from Lead Lists first.");
-        return;
-      }
-
-      // Ensure primary email account is configured before launch
       const { data: emailAccount, error: accountError } = await supabase
-        .from("email_accounts")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("is_primary", true)
-        .maybeSingle();
-
+        .from("email_accounts").select("id").eq("user_id", user.id).eq("is_primary", true).maybeSingle();
       if (accountError) throw accountError;
+      if (!emailAccount?.id) { toast.error("Add a primary email account in Settings first."); navigate("/settings"); return; }
 
-      if (!emailAccount?.id) {
-        toast.error("Add a primary email account in Settings before launching.");
-        navigate("/settings");
-        return;
-      }
-
-      // Group steps by step_order, pick random variant for each step
       const stepsByOrder = campaignSteps.reduce((acc, step) => {
         if (!acc[step.step_order]) acc[step.step_order] = [];
         acc[step.step_order].push(step);
@@ -185,48 +229,24 @@ export default function Campaigns() {
 
       for (const lead of leads) {
         let cumulativeDelay = 0;
-
         for (const [order, variants] of Object.entries(stepsByOrder).sort(([a], [b]) => Number(a) - Number(b))) {
           const step = variants[Math.floor(Math.random() * variants.length)];
           cumulativeDelay += Number(step.delay_days);
-
           const scheduledFor = new Date(now.getTime() + cumulativeDelay * 24 * 60 * 60 * 1000);
-
           followups.push({
-            user_id: user.id,
-            recipient_email: lead.email,
-            subject: step.subject,
-            body: step.body,
-            scheduled_for: scheduledFor.toISOString(),
-            status: "pending",
-            attempt_number: Number(order),
-            max_attempts: Object.keys(stepsByOrder).length,
-            lead_id: lead.id,
-            email_account_id: emailAccount.id,
+            user_id: user.id, recipient_email: lead.email, subject: step.subject, body: step.body,
+            scheduled_for: scheduledFor.toISOString(), status: "pending", attempt_number: Number(order),
+            max_attempts: Object.keys(stepsByOrder).length, lead_id: lead.id, email_account_id: emailAccount.id,
           });
         }
       }
 
-      // Batch insert followups
       const { error: insertError } = await supabase.from("followups").insert(followups);
       if (insertError) throw insertError;
 
-      // Bulk update lead statuses
       const leadIds = leads.map((lead) => lead.id);
-      const { error: updateLeadsError } = await supabase
-        .from("leads")
-        .update({ status: "active" as any })
-        .in("id", leadIds);
-
-      if (updateLeadsError) throw updateLeadsError;
-
-      // Set campaign to active
-      const { error: updateCampaignError } = await supabase
-        .from("campaigns")
-        .update({ status: "active" as any })
-        .eq("id", campaignId);
-
-      if (updateCampaignError) throw updateCampaignError;
+      await supabase.from("leads").update({ status: "active" as any }).in("id", leadIds);
+      await supabase.from("campaigns").update({ status: "active" as any }).eq("id", campaignId);
 
       toast.success(`Launched! ${followups.length} emails queued for ${leads.length} leads`);
       loadData();
@@ -309,6 +329,19 @@ export default function Campaigns() {
         </Button>
       </div>
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && showUploadDialog) handleCSVFile(file, showUploadDialog);
+          e.target.value = "";
+        }}
+      />
+
       {loading ? (
         <div className="text-center py-16 text-sm text-muted-foreground">Loading…</div>
       ) : campaigns.length === 0 ? (
@@ -338,7 +371,27 @@ export default function Campaigns() {
                       <span>Max {campaign.max_followups} steps</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {/* Upload leads buttons */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setShowUploadDialog(campaign.id);
+                        setTimeout(() => fileInputRef.current?.click(), 100);
+                      }}
+                    >
+                      <Upload className="mr-1 h-3 w-3" /> CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => setShowAddLeadDialog(campaign.id)}
+                    >
+                      <Plus className="mr-1 h-3 w-3" /> Lead
+                    </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openSteps(campaign.id)}>
                       Sequence
                     </Button>
@@ -349,7 +402,7 @@ export default function Campaigns() {
                         className="h-7 text-xs"
                         onClick={() => launchCampaign(campaign.id)}
                         disabled={launching === campaign.id || (leadCounts[campaign.id] || 0) === 0 || !hasPrimaryEmailAccount}
-                        title={!hasPrimaryEmailAccount ? "Add a primary email account in Settings first" : (leadCounts[campaign.id] || 0) === 0 ? "Assign at least one lead first" : "Launch campaign"}
+                        title={!hasPrimaryEmailAccount ? "Add a primary email account in Settings first" : (leadCounts[campaign.id] || 0) === 0 ? "Upload leads first" : "Launch campaign"}
                       >
                         {launching === campaign.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Rocket className="mr-1 h-3 w-3" />}
                         Launch
@@ -390,6 +443,60 @@ export default function Campaigns() {
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
             <Button size="sm" onClick={createCampaign} disabled={!newCampaign.name}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Single Lead Dialog */}
+      <Dialog open={!!showAddLeadDialog} onOpenChange={() => setShowAddLeadDialog(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Lead to Campaign</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label className="text-xs">Email *</Label><Input placeholder="lead@company.com" value={newLead.email} onChange={(e) => setNewLead({ ...newLead, email: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Name</Label><Input placeholder="John Doe" value={newLead.name} onChange={(e) => setNewLead({ ...newLead, name: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Company</Label><Input placeholder="Acme Inc." value={newLead.company} onChange={(e) => setNewLead({ ...newLead, company: e.target.value })} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowAddLeadDialog(null)}>Cancel</Button>
+            <Button size="sm" onClick={addLeadToCampaign} disabled={!newLead.email.includes("@")}>Add Lead</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Column Mapping Dialog */}
+      <Dialog open={!!showMappingDialog} onOpenChange={() => setShowMappingDialog(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Map CSV Columns</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Found {csvRows.length} rows. Map columns to fields:</p>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {csvHeaders.map((header, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="text-sm min-w-[120px] truncate font-medium">{header}</span>
+                <Select value={columnMapping[String(i)] || "skip"} onValueChange={(v) => setColumnMapping({ ...columnMapping, [String(i)]: v })}>
+                  <SelectTrigger className="h-8 text-xs flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="skip">Skip</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="company">Company</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+          {csvRows.length > 0 && (
+            <div className="rounded-md bg-muted/50 p-2">
+              <p className="text-[11px] text-muted-foreground font-medium mb-1">Preview (first row):</p>
+              <p className="text-[11px] text-muted-foreground truncate">{csvRows[0].join(" | ")}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowMappingDialog(null)}>Cancel</Button>
+            <Button size="sm" onClick={importMappedCSV} disabled={!Object.values(columnMapping).includes("email")}>
+              Import {csvRows.length} Leads
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Play, Pause, Users, Trash2, Zap, GripVertical, Copy, Rocket, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,12 +31,14 @@ type CampaignStep = {
 
 export default function Campaigns() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showStepsDialog, setShowStepsDialog] = useState<string | null>(null);
   const [newCampaign, setNewCampaign] = useState({ name: "", followup_delay_hours: 48, max_followups: 3 });
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
+  const [hasPrimaryEmailAccount, setHasPrimaryEmailAccount] = useState(true);
   const [templates, setTemplates] = useState<any[]>([]);
   const [steps, setSteps] = useState<CampaignStep[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);

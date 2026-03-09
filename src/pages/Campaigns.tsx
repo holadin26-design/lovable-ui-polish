@@ -49,20 +49,46 @@ export default function Campaigns() {
   }, [user]);
 
   const loadData = async () => {
-    const [{ data }, { data: tmpl }] = await Promise.all([
+    if (!user) return;
+
+    const [{ data, error: campaignsError }, { data: tmpl }, { data: primaryAccount }] = await Promise.all([
       supabase.from("campaigns").select("*").order("created_at", { ascending: false }),
       supabase.from("templates").select("*"),
+      supabase
+        .from("email_accounts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_primary", true)
+        .maybeSingle(),
     ]);
+
+    if (campaignsError) {
+      toast.error(campaignsError.message);
+      setLoading(false);
+      return;
+    }
+
     setCampaigns(data || []);
     setTemplates(tmpl || []);
+    setHasPrimaryEmailAccount(Boolean(primaryAccount));
+
     if (data && data.length > 0) {
-      const counts: Record<string, number> = {};
-      for (const c of data) {
-        const { count } = await supabase.from("leads").select("*", { count: "exact", head: true }).eq("campaign_id", c.id);
-        counts[c.id] = count || 0;
-      }
-      setLeadCounts(counts);
+      const countEntries = await Promise.all(
+        data.map(async (campaign) => {
+          const { count } = await supabase
+            .from("leads")
+            .select("*", { count: "exact", head: true })
+            .eq("campaign_id", campaign.id);
+
+          return [campaign.id, count || 0] as const;
+        })
+      );
+
+      setLeadCounts(Object.fromEntries(countEntries));
+    } else {
+      setLeadCounts({});
     }
+
     setLoading(false);
   };
 

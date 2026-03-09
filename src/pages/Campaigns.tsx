@@ -343,7 +343,14 @@ export default function Campaigns() {
                       Sequence
                     </Button>
                     {campaign.status === "draft" && (
-                      <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => launchCampaign(campaign.id)} disabled={launching === campaign.id}>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        onClick={() => launchCampaign(campaign.id)}
+                        disabled={launching === campaign.id || (leadCounts[campaign.id] || 0) === 0 || !hasPrimaryEmailAccount}
+                        title={!hasPrimaryEmailAccount ? "Add a primary email account in Settings first" : (leadCounts[campaign.id] || 0) === 0 ? "Assign at least one lead first" : "Launch campaign"}
+                      >
                         {launching === campaign.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Rocket className="mr-1 h-3 w-3" />}
                         Launch
                       </Button>

@@ -472,6 +472,33 @@ export type Database = {
           },
         ]
       }
+      warmup_emails: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          responses: string[]
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          responses?: string[]
+          subject: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          responses?: string[]
+          subject?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       warmup_logs: {
         Row: {
           direction: string
@@ -512,42 +539,69 @@ export type Database = {
       }
       warmup_schedules: {
         Row: {
+          addresses_mailed: string[]
+          auto_responder_enabled: boolean
           created_at: string
           current_daily_limit: number
           days_active: number
           email_account_id: string
           id: string
+          increase_rate: number
+          max_days: number
           ramp_increment: number
+          scheduled_at: string | null
+          start_volume: number
           status: Database["public"]["Enums"]["warmup_status"]
+          status_text: string | null
           target_daily_limit: number
+          target_open_rate: number
+          target_reply_rate: number
           total_received: number
           total_sent: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          addresses_mailed?: string[]
+          auto_responder_enabled?: boolean
           created_at?: string
           current_daily_limit?: number
           days_active?: number
           email_account_id: string
           id?: string
+          increase_rate?: number
+          max_days?: number
           ramp_increment?: number
+          scheduled_at?: string | null
+          start_volume?: number
           status?: Database["public"]["Enums"]["warmup_status"]
+          status_text?: string | null
           target_daily_limit?: number
+          target_open_rate?: number
+          target_reply_rate?: number
           total_received?: number
           total_sent?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          addresses_mailed?: string[]
+          auto_responder_enabled?: boolean
           created_at?: string
           current_daily_limit?: number
           days_active?: number
           email_account_id?: string
           id?: string
+          increase_rate?: number
+          max_days?: number
           ramp_increment?: number
+          scheduled_at?: string | null
+          start_volume?: number
           status?: Database["public"]["Enums"]["warmup_status"]
+          status_text?: string | null
           target_daily_limit?: number
+          target_open_rate?: number
+          target_reply_rate?: number
           total_received?: number
           total_sent?: number
           updated_at?: string

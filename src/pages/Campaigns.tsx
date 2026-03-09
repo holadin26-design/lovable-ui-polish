@@ -159,13 +159,14 @@ export default function Campaigns() {
       setCsvHeaders(headers);
       setCsvRows(rows);
 
-      // Auto-detect mappings
+      // Auto-detect mappings — be precise to avoid false positives
       const mapping: Record<string, string> = {};
       headers.forEach((h, i) => {
-        const lower = h.toLowerCase();
-        if (lower.includes("email")) mapping[String(i)] = "email";
-        else if (lower.includes("name")) mapping[String(i)] = "name";
-        else if (lower.includes("company") || lower.includes("org")) mapping[String(i)] = "company";
+        const lower = h.toLowerCase().trim();
+        if (lower === "email" || lower === "e-mail" || lower === "email address") mapping[String(i)] = "email";
+        else if (lower === "name" || lower === "full name" || lower === "first name" || lower === "first_name") mapping[String(i)] = "name";
+        else if (lower === "company" || lower === "company name" || lower === "company_name" || lower === "organization") mapping[String(i)] = "company";
+        // Skip surname, title, etc. — user can map manually
       });
       setColumnMapping(mapping);
       setShowUploadDialog(null);

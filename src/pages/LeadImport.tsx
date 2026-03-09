@@ -161,6 +161,30 @@ export default function LeadImport() {
     if (file) handleFileUpload(file);
   };
 
+  // Bulk validate all unvalidated leads
+  const validateAllUnvalidated = async () => {
+    const unvalidated = leads.filter(l => !l.validation_status || l.validation_status === 'pending');
+    if (unvalidated.length === 0) { toast.info("All leads are already validated"); return; }
+    setBulkValidating(true);
+    try {
+      const ids = unvalidated.map(l => l.id);
+      // Process in batches of 50
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        const { data, error } = await supabase.functions.invoke("validate-leads", {
+          body: { lead_ids: batch },
+        });
+        if (error) throw error;
+      }
+      toast.success(`Validated ${ids.length} leads`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Bulk validation failed");
+    } finally {
+      setBulkValidating(false);
+    }
+  };
+
   // Batch validation
   const validateSelected = async () => {
     if (selectedLeads.size === 0) { toast.error("Select leads first"); return; }

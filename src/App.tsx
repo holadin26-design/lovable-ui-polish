@@ -53,6 +53,7 @@ function AppRoutes() {
       <Route path="/settings" element={<PrivateRoute><AppLayout><SettingsPage /></AppLayout></PrivateRoute>} />
       <Route path="/warmup" element={<PrivateRoute><AppLayout><WarmupPage /></AppLayout></PrivateRoute>} />
       <Route path="/analytics" element={<PrivateRoute><AppLayout><AnalyticsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/bulk-send" element={<PrivateRoute><AppLayout><BulkSend /></AppLayout></PrivateRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

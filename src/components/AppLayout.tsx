@@ -14,6 +14,7 @@ import {
   Flame,
   ChevronLeft,
   BarChart3,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

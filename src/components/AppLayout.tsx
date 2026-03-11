@@ -14,6 +14,7 @@ import {
   Flame,
   ChevronLeft,
   BarChart3,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Sequences", path: "/followups", icon: Clock },
   { name: "Lead Lists", path: "/leads", icon: Upload },
   { name: "Campaigns", path: "/campaigns", icon: Zap },
+  { name: "Bulk Send", path: "/bulk-send", icon: Send },
   { name: "Templates", path: "/templates", icon: FileText },
   { name: "Warmup", path: "/warmup", icon: Flame },
   { name: "Analytics", path: "/analytics", icon: BarChart3 },

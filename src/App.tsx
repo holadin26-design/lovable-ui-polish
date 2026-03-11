@@ -14,6 +14,7 @@ import LeadImport from "@/pages/LeadImport";
 import SettingsPage from "@/pages/SettingsPage";
 import WarmupPage from "@/pages/WarmupPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
+import BulkSend from "@/pages/BulkSend";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
